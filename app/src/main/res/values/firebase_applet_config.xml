@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<resources>
+    <string name="firestore_database_id" translatable="false">ai-studio-android-zelumath-8f5f92e6-0aea-4c9c-aee3-bba9db00af73</string>
+    <string name="recaptcha_site_key" translatable="false">6LctviQuAAAAAMpNSg4tPlBlc79td4RCTrYbs4cm</string>
+</resources>

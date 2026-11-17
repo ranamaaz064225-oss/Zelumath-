@@ -1,0 +1,456 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global safety net: deny all access by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- HARDENED GLOBAL HELPERS ---
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        ('email_verified' in request.auth.token &&
+         'email' in request.auth.token &&
+         request.auth.token.email_verified == true &&
+         request.auth.token.email == 'ranamaaz064225@gmail.com')
+      );
+    }
+
+    function isTimestampValid(ts) {
+      return ts is timestamp && ts <= request.time;
+    }
+
+    // --- ENTITY VALIDATION HELPERS ---
+    function isValidUserProfile(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 120 &&
+             (!('email' in data) || (data.email is string && data.email.size() <= 200)) &&
+             (!('photoUrl' in data) || (data.photoUrl is string && data.photoUrl.size() <= 600)) &&
+             data.preferredLanguage in ['en', 'ur'] &&
+             data.country is string && data.country.size() >= 1 && data.country.size() <= 80 &&
+             data.board is string && data.board.size() >= 1 && data.board.size() <= 80 &&
+             data.studentClass is string && data.studentClass.size() >= 1 && data.studentClass.size() <= 80 &&
+             data.planTier in ['FREE', 'PREMIUM', 'PRO'] &&
+             data.status in ['active', 'suspended'] &&
+             data.dailyQuestionsUsed is int && data.dailyQuestionsUsed >= 0 && data.dailyQuestionsUsed <= 100000 &&
+             data.dailyScansUsed is int && data.dailyScansUsed >= 0 && data.dailyScansUsed <= 100000 &&
+             data.totalSolved is int && data.totalSolved >= 0 && data.totalSolved <= 1000000 &&
+             isTimestampValid(data.createdAt) &&
+             isTimestampValid(data.updatedAt);
+    }
+
+    function isValidSolvedQuestion(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.questionText is string && data.questionText.size() >= 1 && data.questionText.size() <= 4000 &&
+             (!('detectedExpression' in data) || (data.detectedExpression is string && data.detectedExpression.size() <= 1000)) &&
+             data.inputMode in ['text', 'camera', 'voice', 'whiteboard'] &&
+             data.language in ['en', 'ur'] &&
+             data.difficultyLevel in ['easy', 'detailed'] &&
+             data.subject is string && data.subject.size() >= 1 && data.subject.size() <= 100 &&
+             (!('verificationStatus' in data) || (data.verificationStatus is string && data.verificationStatus.size() <= 200)) &&
+             (!('identification' in data) || (data.identification is string && data.identification.size() <= 2000)) &&
+             (!('givenInfo' in data) || (data.givenInfo is string && data.givenInfo.size() <= 2000)) &&
+             (!('relevantFormula' in data) || (data.relevantFormula is string && data.relevantFormula.size() <= 1000)) &&
+             (!('formulaExplanation' in data) || (data.formulaExplanation is string && data.formulaExplanation.size() <= 2000)) &&
+             data.steps is list && data.steps.size() <= 25 && (data.steps.size() == 0 || data.steps[0] is string) &&
+             (!('calculations' in data) || (data.calculations is string && data.calculations.size() <= 4000)) &&
+             data.finalAnswer is string && data.finalAnswer.size() >= 1 && data.finalAnswer.size() <= 2000 &&
+             (!('verification' in data) || (data.verification is string && data.verification.size() <= 2000)) &&
+             (!('whyItWorks' in data) || (data.whyItWorks is string && data.whyItWorks.size() <= 2000)) &&
+             (!('practiceQuestion' in data) || (data.practiceQuestion is string && data.practiceQuestion.size() <= 2000)) &&
+             data.bookmarked is bool &&
+             data.saved is bool &&
+             isTimestampValid(data.createdAt) &&
+             isTimestampValid(data.updatedAt);
+    }
+
+    function isValidScanRecord(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.detectedText is string && data.detectedText.size() >= 1 && data.detectedText.size() <= 4000 &&
+             data.clarityStatus in ['clear', 'unclear'] &&
+             data.subject is string && data.subject.size() >= 1 && data.subject.size() <= 100 &&
+             (!('questionId' in data) || (data.questionId is string && data.questionId.size() <= 128)) &&
+             isTimestampValid(data.createdAt);
+    }
+
+    function isValidPracticeAttempt(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.subject is string && data.subject.size() >= 1 && data.subject.size() <= 100 &&
+             data.topic is string && data.topic.size() >= 1 && data.topic.size() <= 200 &&
+             (!('board' in data) || (data.board is string && data.board.size() <= 100)) &&
+             (!('studentClass' in data) || (data.studentClass is string && data.studentClass.size() <= 80)) &&
+             data.totalQuestions is int && data.totalQuestions >= 1 && data.totalQuestions <= 100 &&
+             data.correctCount is int && data.correctCount >= 0 && data.correctCount <= data.totalQuestions &&
+             data.scorePercent is int && data.scorePercent >= 0 && data.scorePercent <= 100 &&
+             isTimestampValid(data.createdAt);
+    }
+
+    function isValidUserNotification(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 200 &&
+             data.body is string && data.body.size() >= 1 && data.body.size() <= 1000 &&
+             data.read is bool &&
+             isTimestampValid(data.createdAt);
+    }
+
+    function isValidSupportTicket(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             (!('userEmail' in data) || (data.userEmail is string && data.userEmail.size() <= 200)) &&
+             data.subject is string && data.subject.size() >= 2 && data.subject.size() <= 200 &&
+             data.message is string && data.message.size() >= 5 && data.message.size() <= 4000 &&
+             data.category is string && data.category.size() >= 1 && data.category.size() <= 80 &&
+             data.status in ['open', 'in_progress', 'resolved'] &&
+             (!('adminReply' in data) || (data.adminReply is string && data.adminReply.size() <= 2000)) &&
+             isTimestampValid(data.createdAt) &&
+             isTimestampValid(data.updatedAt);
+    }
+
+    function isValidCurriculumItem(data) {
+      return data.country is string && data.country.size() >= 1 && data.country.size() <= 80 &&
+             data.board is string && data.board.size() >= 1 && data.board.size() <= 100 &&
+             data.studentClass is string && data.studentClass.size() >= 1 && data.studentClass.size() <= 80 &&
+             data.subject is string && data.subject.size() >= 1 && data.subject.size() <= 100 &&
+             data.bookTitle is string && data.bookTitle.size() >= 1 && data.bookTitle.size() <= 200 &&
+             data.chapterTitle is string && data.chapterTitle.size() >= 1 && data.chapterTitle.size() <= 200 &&
+             data.exerciseTitle is string && data.exerciseTitle.size() >= 1 && data.exerciseTitle.size() <= 200 &&
+             data.questionPrompt is string && data.questionPrompt.size() >= 1 && data.questionPrompt.size() <= 3000 &&
+             data.sourceNote is string && data.sourceNote.size() >= 1 && data.sourceNote.size() <= 400 &&
+             data.published is bool &&
+             data.createdByUid is string && data.createdByUid.size() >= 1 && data.createdByUid.size() <= 128 &&
+             isTimestampValid(data.createdAt) &&
+             isTimestampValid(data.updatedAt);
+    }
+
+    function isValidPlan(data) {
+      return data.name is string && data.name.size() >= 1 && data.name.size() <= 80 &&
+             data.tier in ['FREE', 'PREMIUM', 'PRO'] &&
+             data.monthlyPriceUsd is number && data.monthlyPriceUsd >= 0 && data.monthlyPriceUsd <= 10000 &&
+             data.monthlyPricePkr is int && data.monthlyPricePkr >= 0 && data.monthlyPricePkr <= 5000000 &&
+             data.dailyQuestionLimit is int && data.dailyQuestionLimit >= 1 && data.dailyQuestionLimit <= 100000 &&
+             data.dailyScanLimit is int && data.dailyScanLimit >= 1 && data.dailyScanLimit <= 100000 &&
+             data.voiceTeacherEnabled is bool &&
+             data.whiteboardAiEnabled is bool &&
+             data.features is list && data.features.size() <= 20 && (data.features.size() == 0 || data.features[0] is string) &&
+             data.active is bool &&
+             isTimestampValid(data.updatedAt);
+    }
+
+    function isValidPaymentMethod(data) {
+      return data.name is string && data.name.size() >= 1 && data.name.size() <= 100 &&
+             data.providerType is string && data.providerType.size() >= 1 && data.providerType.size() <= 80 &&
+             (!('accountTitle' in data) || (data.accountTitle is string && data.accountTitle.size() <= 120)) &&
+             data.accountNumber is string && data.accountNumber.size() >= 1 && data.accountNumber.size() <= 120 &&
+             (!('instructions' in data) || (data.instructions is string && data.instructions.size() <= 1000)) &&
+             data.enabled is bool &&
+             isTimestampValid(data.updatedAt);
+    }
+
+    function isValidSystemSettings(data) {
+      return data.aiModel is string && data.aiModel.size() >= 1 && data.aiModel.size() <= 100 &&
+             data.dailyFreeLimit is int && data.dailyFreeLimit >= 1 && data.dailyFreeLimit <= 100000 &&
+             data.defaultVoiceLang in ['en', 'ur'] &&
+             data.defaultSpeechRate is number && data.defaultSpeechRate >= 0.5 && data.defaultSpeechRate <= 2.0 &&
+             (!('defaultVoicePersona' in data) || data.defaultVoicePersona in ['madam', 'teacher']) &&
+             (!('defaultVoicePitch' in data) || (data.defaultVoicePitch is number && data.defaultVoicePitch >= 0.6 && data.defaultVoicePitch <= 1.5)) &&
+             (!('announcementBannerEn' in data) || (data.announcementBannerEn is string && data.announcementBannerEn.size() <= 500)) &&
+             (!('announcementBannerUr' in data) || (data.announcementBannerUr is string && data.announcementBannerUr.size() <= 500)) &&
+             (!('siteTitle' in data) || (data.siteTitle is string && data.siteTitle.size() <= 120)) &&
+             (!('siteTagline' in data) || (data.siteTagline is string && data.siteTagline.size() <= 200)) &&
+             (!('seoTitle' in data) || (data.seoTitle is string && data.seoTitle.size() <= 200)) &&
+             (!('seoDescription' in data) || (data.seoDescription is string && data.seoDescription.size() <= 500)) &&
+             (!('seoKeywords' in data) || (data.seoKeywords is string && data.seoKeywords.size() <= 400)) &&
+             (!('themeAccentHex' in data) || (data.themeAccentHex is string && data.themeAccentHex.size() <= 20)) &&
+             (!('defaultThemeMode' in data) || data.defaultThemeMode in ['system', 'light', 'dark']) &&
+             (!('headerNotice' in data) || (data.headerNotice is string && data.headerNotice.size() <= 300)) &&
+             (!('footerText' in data) || (data.footerText is string && data.footerText.size() <= 400)) &&
+             (!('adBannerText' in data) || (data.adBannerText is string && data.adBannerText.size() <= 1000)) &&
+             (!('customHeaderScript' in data) || (data.customHeaderScript is string && data.customHeaderScript.size() <= 4000)) &&
+             (!('customFooterScript' in data) || (data.customFooterScript is string && data.customFooterScript.size() <= 4000)) &&
+             (!('socialFacebook' in data) || (data.socialFacebook is string && data.socialFacebook.size() <= 300)) &&
+             (!('socialYoutube' in data) || (data.socialYoutube is string && data.socialYoutube.size() <= 300)) &&
+             (!('socialInstagram' in data) || (data.socialInstagram is string && data.socialInstagram.size() <= 300)) &&
+             (!('socialWhatsapp' in data) || (data.socialWhatsapp is string && data.socialWhatsapp.size() <= 300)) &&
+             (!('socialEmail' in data) || (data.socialEmail is string && data.socialEmail.size() <= 200)) &&
+             (!('logoBase64' in data) || (data.logoBase64 is string && data.logoBase64.size() <= 150000)) &&
+             (!('bannerBase64' in data) || (data.bannerBase64 is string && data.bannerBase64.size() <= 250000)) &&
+             (!('faviconBase64' in data) || (data.faviconBase64 is string && data.faviconBase64.size() <= 80000)) &&
+             data.adsEnabled is bool &&
+             data.publicRead is bool &&
+             isTimestampValid(data.updatedAt);
+    }
+
+    function isValidAdminSecurityConfig(data) {
+      return (!('passwordSalt' in data) || (data.passwordSalt is string && data.passwordSalt.size() <= 100)) &&
+             (!('passwordHash' in data) || (data.passwordHash is string && data.passwordHash.size() <= 200)) &&
+             data.passwordConfigured is bool &&
+             data.twoFactorEnabled is bool &&
+             (!('totpSecret' in data) || (data.totpSecret is string && data.totpSecret.size() <= 128)) &&
+             data.recoveryEmail is string && data.recoveryEmail.size() <= 200 &&
+             (!('resetTokenHash' in data) || (data.resetTokenHash is string && data.resetTokenHash.size() <= 200)) &&
+             (!('resetExpiresAt' in data) || (data.resetExpiresAt is int && data.resetExpiresAt >= 0)) &&
+             isTimestampValid(data.updatedAt);
+    }
+
+    function isValidAdminLog(data) {
+      return data.adminUid is string && data.adminUid == request.auth.uid &&
+             data.adminEmail is string && data.adminEmail.size() <= 200 &&
+             data.action is string && data.action.size() >= 1 && data.action.size() <= 120 &&
+             data.targetPath is string && data.targetPath.size() >= 1 && data.targetPath.size() <= 300 &&
+             data.details is string && data.details.size() <= 1000 &&
+             isTimestampValid(data.createdAt);
+    }
+
+    // --- COLLECTIONS ---
+
+    match /users/{userId} {
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isAdmin();
+
+      // Users can create their own profile ONLY with FREE tier and active status (never self-promote or bypass)
+      allow create: if isValidId(userId) &&
+                       isOwner(userId) &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().planTier == 'FREE' &&
+                       incoming().status == 'active' &&
+                       incoming().keys().hasAll(['userId', 'displayName', 'preferredLanguage', 'country', 'board', 'studentClass', 'planTier', 'status', 'dailyQuestionsUsed', 'dailyScansUsed', 'totalSolved', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['userId', 'displayName', 'email', 'photoUrl', 'preferredLanguage', 'country', 'board', 'studentClass', 'planTier', 'status', 'dailyQuestionsUsed', 'dailyScansUsed', 'totalSolved', 'createdAt', 'updatedAt']) &&
+                       isValidUserProfile(incoming());
+
+      allow update: if isValidId(userId) && isSignedIn() && isValidUserProfile(incoming()) && (
+        (
+          isAdmin() &&
+          incoming().userId == existing().userId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'preferredLanguage', 'country', 'board', 'studentClass', 'planTier', 'status', 'dailyQuestionsUsed', 'dailyScansUsed', 'totalSolved', 'updatedAt'])
+        ) || (
+          isOwner(userId) &&
+          existing().status == 'active' &&
+          incoming().userId == existing().userId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().planTier == existing().planTier &&
+          incoming().status == existing().status &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'email', 'photoUrl', 'preferredLanguage', 'country', 'board', 'studentClass', 'dailyQuestionsUsed', 'dailyScansUsed', 'totalSolved', 'updatedAt'])
+        )
+      );
+
+      allow delete: if isValidId(userId) && (isOwner(userId) || isAdmin());
+
+      match /questions/{questionId} {
+        allow get: if isValidId(userId) && isValidId(questionId) && (isOwner(userId) || isAdmin());
+        allow list: if isOwner(userId) || isAdmin();
+        allow create: if isValidId(userId) && isValidId(questionId) &&
+                         isOwner(userId) &&
+                         incoming().userId == request.auth.uid &&
+                         incoming().keys().hasAll(['userId', 'questionText', 'inputMode', 'language', 'difficultyLevel', 'subject', 'steps', 'finalAnswer', 'bookmarked', 'saved', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['userId', 'questionText', 'detectedExpression', 'inputMode', 'language', 'difficultyLevel', 'subject', 'verificationStatus', 'identification', 'givenInfo', 'relevantFormula', 'formulaExplanation', 'steps', 'calculations', 'finalAnswer', 'verification', 'whyItWorks', 'practiceQuestion', 'bookmarked', 'saved', 'createdAt', 'updatedAt']) &&
+                         isValidSolvedQuestion(incoming());
+        allow update: if isValidId(userId) && isValidId(questionId) &&
+                         isOwner(userId) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         isValidSolvedQuestion(incoming()) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['bookmarked', 'saved', 'updatedAt']);
+        allow delete: if isValidId(userId) && isValidId(questionId) && (isOwner(userId) || isAdmin());
+      }
+
+      match /scanHistory/{scanId} {
+        allow get: if isValidId(userId) && isValidId(scanId) && (isOwner(userId) || isAdmin());
+        allow list: if isOwner(userId) || isAdmin();
+        allow create: if isValidId(userId) && isValidId(scanId) &&
+                         isOwner(userId) &&
+                         incoming().userId == request.auth.uid &&
+                         incoming().keys().hasAll(['userId', 'detectedText', 'clarityStatus', 'subject', 'createdAt']) &&
+                         incoming().keys().hasOnly(['userId', 'detectedText', 'clarityStatus', 'subject', 'questionId', 'createdAt']) &&
+                         isValidScanRecord(incoming());
+        allow update: if false;
+        allow delete: if isValidId(userId) && isValidId(scanId) && (isOwner(userId) || isAdmin());
+      }
+
+      match /practiceAttempts/{attemptId} {
+        allow get: if isValidId(userId) && isValidId(attemptId) && (isOwner(userId) || isAdmin());
+        allow list: if isOwner(userId) || isAdmin();
+        allow create: if isValidId(userId) && isValidId(attemptId) &&
+                         isOwner(userId) &&
+                         incoming().userId == request.auth.uid &&
+                         incoming().keys().hasAll(['userId', 'subject', 'topic', 'totalQuestions', 'correctCount', 'scorePercent', 'createdAt']) &&
+                         incoming().keys().hasOnly(['userId', 'subject', 'topic', 'board', 'studentClass', 'totalQuestions', 'correctCount', 'scorePercent', 'createdAt']) &&
+                         isValidPracticeAttempt(incoming());
+        allow update: if false;
+        allow delete: if isValidId(userId) && isValidId(attemptId) && (isOwner(userId) || isAdmin());
+      }
+
+      match /notifications/{notificationId} {
+        allow get: if isValidId(userId) && isValidId(notificationId) && (isOwner(userId) || isAdmin());
+        allow list: if isOwner(userId) || isAdmin();
+        allow create: if isValidId(userId) && isValidId(notificationId) &&
+                         (isOwner(userId) || isAdmin()) &&
+                         incoming().userId == userId &&
+                         incoming().keys().hasAll(['userId', 'title', 'body', 'read', 'createdAt']) &&
+                         incoming().keys().hasOnly(['userId', 'title', 'body', 'read', 'createdAt']) &&
+                         isValidUserNotification(incoming());
+        allow update: if isValidId(userId) && isValidId(notificationId) &&
+                         isOwner(userId) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         isValidUserNotification(incoming()) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['read']);
+        allow delete: if isValidId(userId) && isValidId(notificationId) && (isOwner(userId) || isAdmin());
+      }
+    }
+
+    match /supportTickets/{ticketId} {
+      allow get: if isValidId(ticketId) && isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+      allow create: if isValidId(ticketId) && isSignedIn() &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().status == 'open' &&
+                       incoming().keys().hasAll(['userId', 'subject', 'message', 'category', 'status', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['userId', 'userEmail', 'subject', 'message', 'category', 'status', 'adminReply', 'createdAt', 'updatedAt']) &&
+                       isValidSupportTicket(incoming());
+      allow update: if isValidId(ticketId) && isSignedIn() && isValidSupportTicket(incoming()) && (
+        (
+          isAdmin() &&
+          incoming().userId == existing().userId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['status', 'adminReply', 'updatedAt'])
+        )
+      );
+      allow delete: if isValidId(ticketId) && isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+    }
+
+    match /curriculum/{itemId} {
+      allow get: if isValidId(itemId) && isSignedIn() && (existing().published == true || isAdmin());
+      allow list: if isSignedIn() && (existing().published == true || isAdmin());
+      allow create: if isValidId(itemId) && isAdmin() &&
+                       incoming().createdByUid == request.auth.uid &&
+                       incoming().keys().hasAll(['country', 'board', 'studentClass', 'subject', 'bookTitle', 'chapterTitle', 'exerciseTitle', 'questionPrompt', 'sourceNote', 'published', 'createdByUid', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['country', 'board', 'studentClass', 'subject', 'bookTitle', 'chapterTitle', 'exerciseTitle', 'questionPrompt', 'sourceNote', 'published', 'createdByUid', 'createdAt', 'updatedAt']) &&
+                       isValidCurriculumItem(incoming());
+      allow update: if isValidId(itemId) && isAdmin() &&
+                       incoming().createdByUid == existing().createdByUid &&
+                       incoming().createdAt == existing().createdAt &&
+                       isValidCurriculumItem(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['country', 'board', 'studentClass', 'subject', 'bookTitle', 'chapterTitle', 'exerciseTitle', 'questionPrompt', 'sourceNote', 'published', 'updatedAt']);
+      allow delete: if isValidId(itemId) && isAdmin();
+    }
+
+    match /plans/{planId} {
+      allow get: if isValidId(planId) && isSignedIn() && (existing().active == true || isAdmin());
+      allow list: if isSignedIn() && (existing().active == true || isAdmin());
+      allow create: if isValidId(planId) && isAdmin() &&
+                       incoming().keys().hasAll(['name', 'tier', 'monthlyPriceUsd', 'monthlyPricePkr', 'dailyQuestionLimit', 'dailyScanLimit', 'voiceTeacherEnabled', 'whiteboardAiEnabled', 'features', 'active', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['name', 'tier', 'monthlyPriceUsd', 'monthlyPricePkr', 'dailyQuestionLimit', 'dailyScanLimit', 'voiceTeacherEnabled', 'whiteboardAiEnabled', 'features', 'active', 'updatedAt']) &&
+                       isValidPlan(incoming());
+      allow update: if isValidId(planId) && isAdmin() &&
+                       isValidPlan(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['name', 'tier', 'monthlyPriceUsd', 'monthlyPricePkr', 'dailyQuestionLimit', 'dailyScanLimit', 'voiceTeacherEnabled', 'whiteboardAiEnabled', 'features', 'active', 'updatedAt']);
+      allow delete: if isValidId(planId) && isAdmin();
+    }
+
+    match /paymentMethods/{methodId} {
+      allow get: if isValidId(methodId) && isSignedIn() && (existing().enabled == true || isAdmin());
+      allow list: if isSignedIn() && (existing().enabled == true || isAdmin());
+      allow create: if isValidId(methodId) && isAdmin() &&
+                       incoming().keys().hasAll(['name', 'providerType', 'accountNumber', 'enabled', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['name', 'providerType', 'accountTitle', 'accountNumber', 'instructions', 'enabled', 'updatedAt']) &&
+                       isValidPaymentMethod(incoming());
+      allow update: if isValidId(methodId) && isAdmin() &&
+                       isValidPaymentMethod(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['name', 'providerType', 'accountTitle', 'accountNumber', 'instructions', 'enabled', 'updatedAt']);
+      allow delete: if isValidId(methodId) && isAdmin();
+    }
+
+    match /systemSettings/{settingId} {
+      allow get: if isValidId(settingId) && isSignedIn() && (existing().publicRead == true || isAdmin());
+      allow list: if isSignedIn() && (existing().publicRead == true || isAdmin());
+      allow create: if isValidId(settingId) && isAdmin() &&
+                       incoming().keys().hasAll(['aiModel', 'dailyFreeLimit', 'defaultVoiceLang', 'defaultSpeechRate', 'adsEnabled', 'publicRead', 'updatedAt']) &&
+                       incoming().keys().hasOnly([
+                         'aiModel', 'dailyFreeLimit', 'defaultVoiceLang', 'defaultSpeechRate',
+                         'defaultVoicePersona', 'defaultVoicePitch',
+                         'announcementBannerEn', 'announcementBannerUr',
+                         'adsEnabled', 'publicRead',
+                         'siteTitle', 'siteTagline', 'seoTitle', 'seoDescription', 'seoKeywords',
+                         'themeAccentHex', 'defaultThemeMode', 'headerNotice', 'footerText',
+                         'adBannerText', 'customHeaderScript', 'customFooterScript',
+                         'socialFacebook', 'socialYoutube', 'socialInstagram', 'socialWhatsapp', 'socialEmail',
+                         'logoBase64', 'bannerBase64', 'faviconBase64',
+                         'updatedAt'
+                       ]) &&
+                       isValidSystemSettings(incoming());
+      allow update: if isValidId(settingId) && isAdmin() &&
+                       isValidSystemSettings(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'aiModel', 'dailyFreeLimit', 'defaultVoiceLang', 'defaultSpeechRate',
+                         'defaultVoicePersona', 'defaultVoicePitch',
+                         'announcementBannerEn', 'announcementBannerUr',
+                         'adsEnabled', 'publicRead',
+                         'siteTitle', 'siteTagline', 'seoTitle', 'seoDescription', 'seoKeywords',
+                         'themeAccentHex', 'defaultThemeMode', 'headerNotice', 'footerText',
+                         'adBannerText', 'customHeaderScript', 'customFooterScript',
+                         'socialFacebook', 'socialYoutube', 'socialInstagram', 'socialWhatsapp', 'socialEmail',
+                         'logoBase64', 'bannerBase64', 'faviconBase64',
+                         'updatedAt'
+                       ]);
+      allow delete: if isValidId(settingId) && isAdmin();
+    }
+
+    match /adminSecurity/{docId} {
+      allow get, list: if isValidId(docId) && isAdmin();
+      allow create: if isValidId(docId) && isAdmin() &&
+                       incoming().keys().hasAll(['passwordConfigured', 'twoFactorEnabled', 'recoveryEmail', 'updatedAt']) &&
+                       incoming().keys().hasOnly([
+                         'passwordSalt', 'passwordHash', 'passwordConfigured',
+                         'twoFactorEnabled', 'totpSecret', 'recoveryEmail',
+                         'resetTokenHash', 'resetExpiresAt', 'updatedAt'
+                       ]) &&
+                       isValidAdminSecurityConfig(incoming());
+      allow update: if isValidId(docId) && isAdmin() &&
+                       isValidAdminSecurityConfig(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'passwordSalt', 'passwordHash', 'passwordConfigured',
+                         'twoFactorEnabled', 'totpSecret', 'recoveryEmail',
+                         'resetTokenHash', 'resetExpiresAt', 'updatedAt'
+                       ]);
+      allow delete: if isValidId(docId) && isAdmin();
+    }
+
+    match /admins/{adminId} {
+      allow get: if isValidId(adminId) && isSignedIn() && (request.auth.uid == adminId || isAdmin());
+      allow list: if isAdmin();
+      allow write: if false;
+    }
+
+    match /adminLogs/{logId} {
+      allow get: if isValidId(logId) && isAdmin();
+      allow list: if isAdmin();
+      allow create: if isValidId(logId) && isAdmin() &&
+                       incoming().keys().hasAll(['adminUid', 'adminEmail', 'action', 'targetPath', 'details', 'createdAt']) &&
+                       incoming().keys().hasOnly(['adminUid', 'adminEmail', 'action', 'targetPath', 'details', 'createdAt']) &&
+                       isValidAdminLog(incoming());
+      allow update, delete: if false;
+    }
+  }
+}

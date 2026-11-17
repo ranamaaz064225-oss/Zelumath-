@@ -1,0 +1,308 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Student or admin user profile, preferences, and usage counters.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "photoUrl": { "type": "string" },
+        "preferredLanguage": { "type": "string", "enum": ["en", "ur"] },
+        "country": { "type": "string" },
+        "board": { "type": "string" },
+        "studentClass": { "type": "string" },
+        "planTier": { "type": "string", "enum": ["FREE", "PREMIUM", "PRO"] },
+        "status": { "type": "string", "enum": ["active", "suspended"] },
+        "dailyQuestionsUsed": { "type": "integer" },
+        "dailyScansUsed": { "type": "integer" },
+        "totalSolved": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "displayName", "preferredLanguage", "country", "board", "studentClass", "planTier", "status", "dailyQuestionsUsed", "dailyScansUsed", "totalSolved", "createdAt", "updatedAt"]
+    },
+    "SolvedQuestion": {
+      "title": "SolvedQuestion",
+      "description": "User math question and 10-part AI teacher mode solution.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "questionText": { "type": "string" },
+        "detectedExpression": { "type": "string" },
+        "inputMode": { "type": "string", "enum": ["text", "camera", "voice", "whiteboard"] },
+        "language": { "type": "string", "enum": ["en", "ur"] },
+        "difficultyLevel": { "type": "string", "enum": ["easy", "detailed"] },
+        "subject": { "type": "string" },
+        "verificationStatus": { "type": "string" },
+        "identification": { "type": "string" },
+        "givenInfo": { "type": "string" },
+        "relevantFormula": { "type": "string" },
+        "formulaExplanation": { "type": "string" },
+        "steps": { "type": "array" },
+        "calculations": { "type": "string" },
+        "finalAnswer": { "type": "string" },
+        "verification": { "type": "string" },
+        "whyItWorks": { "type": "string" },
+        "practiceQuestion": { "type": "string" },
+        "bookmarked": { "type": "boolean" },
+        "saved": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "questionText", "inputMode", "language", "difficultyLevel", "subject", "finalAnswer", "steps", "bookmarked", "saved", "createdAt", "updatedAt"]
+    },
+    "ScanRecord": {
+      "title": "ScanRecord",
+      "description": "Metadata for camera or photo math scans.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "detectedText": { "type": "string" },
+        "clarityStatus": { "type": "string", "enum": ["clear", "unclear"] },
+        "subject": { "type": "string" },
+        "questionId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "detectedText", "clarityStatus", "subject", "createdAt"]
+    },
+    "PracticeAttempt": {
+      "title": "PracticeAttempt",
+      "description": "Completed practice test score record.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "subject": { "type": "string" },
+        "topic": { "type": "string" },
+        "board": { "type": "string" },
+        "studentClass": { "type": "string" },
+        "totalQuestions": { "type": "integer" },
+        "correctCount": { "type": "integer" },
+        "scorePercent": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "subject", "topic", "totalQuestions", "correctCount", "scorePercent", "createdAt"]
+    },
+    "SupportTicket": {
+      "title": "SupportTicket",
+      "description": "Student support or contact inquiry.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "subject": { "type": "string" },
+        "message": { "type": "string" },
+        "category": { "type": "string" },
+        "status": { "type": "string", "enum": ["open", "in_progress", "resolved"] },
+        "adminReply": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "subject", "message", "category", "status", "createdAt", "updatedAt"]
+    },
+    "UserNotification": {
+      "title": "UserNotification",
+      "description": "In-app notification for a student.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "body": { "type": "string" },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "body", "read", "createdAt"]
+    },
+    "CurriculumItem": {
+      "title": "CurriculumItem",
+      "description": "Structured Country -> Board -> Class -> Subject -> Book -> Chapter -> Exercise -> Question item.",
+      "type": "object",
+      "properties": {
+        "country": { "type": "string" },
+        "board": { "type": "string" },
+        "studentClass": { "type": "string" },
+        "subject": { "type": "string" },
+        "bookTitle": { "type": "string" },
+        "chapterTitle": { "type": "string" },
+        "exerciseTitle": { "type": "string" },
+        "questionPrompt": { "type": "string" },
+        "sourceNote": { "type": "string" },
+        "published": { "type": "boolean" },
+        "createdByUid": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["country", "board", "studentClass", "subject", "bookTitle", "chapterTitle", "exerciseTitle", "questionPrompt", "sourceNote", "published", "createdByUid", "createdAt", "updatedAt"]
+    },
+    "SubscriptionPlan": {
+      "title": "SubscriptionPlan",
+      "description": "Configurable subscription tier.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "tier": { "type": "string", "enum": ["FREE", "PREMIUM", "PRO"] },
+        "monthlyPriceUsd": { "type": "number" },
+        "monthlyPricePkr": { "type": "integer" },
+        "dailyQuestionLimit": { "type": "integer" },
+        "dailyScanLimit": { "type": "integer" },
+        "voiceTeacherEnabled": { "type": "boolean" },
+        "whiteboardAiEnabled": { "type": "boolean" },
+        "features": { "type": "array" },
+        "active": { "type": "boolean" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "tier", "monthlyPriceUsd", "monthlyPricePkr", "dailyQuestionLimit", "dailyScanLimit", "voiceTeacherEnabled", "whiteboardAiEnabled", "features", "active", "updatedAt"]
+    },
+    "PaymentMethod": {
+      "title": "PaymentMethod",
+      "description": "Admin-managed payment method (JazzCash, EasyPaisa, Bank, Card).",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "providerType": { "type": "string" },
+        "accountTitle": { "type": "string" },
+        "accountNumber": { "type": "string" },
+        "instructions": { "type": "string" },
+        "enabled": { "type": "boolean" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "providerType", "accountNumber", "enabled", "updatedAt"]
+    },
+    "SystemSettings": {
+      "title": "SystemSettings",
+      "description": "Global platform configuration for AI, Voice, Branding, SEO, Theme, Footer, Socials, Ads, and Scripts.",
+      "type": "object",
+      "properties": {
+        "aiModel": { "type": "string" },
+        "dailyFreeLimit": { "type": "integer" },
+        "defaultVoiceLang": { "type": "string" },
+        "defaultSpeechRate": { "type": "number" },
+        "defaultVoicePersona": { "type": "string", "enum": ["madam", "teacher"] },
+        "defaultVoicePitch": { "type": "number" },
+        "announcementBannerEn": { "type": "string" },
+        "announcementBannerUr": { "type": "string" },
+        "adsEnabled": { "type": "boolean" },
+        "publicRead": { "type": "boolean" },
+        "siteTitle": { "type": "string" },
+        "siteTagline": { "type": "string" },
+        "seoTitle": { "type": "string" },
+        "seoDescription": { "type": "string" },
+        "seoKeywords": { "type": "string" },
+        "themeAccentHex": { "type": "string" },
+        "defaultThemeMode": { "type": "string", "enum": ["system", "light", "dark"] },
+        "headerNotice": { "type": "string" },
+        "footerText": { "type": "string" },
+        "adBannerText": { "type": "string" },
+        "customHeaderScript": { "type": "string" },
+        "customFooterScript": { "type": "string" },
+        "socialFacebook": { "type": "string" },
+        "socialYoutube": { "type": "string" },
+        "socialInstagram": { "type": "string" },
+        "socialWhatsapp": { "type": "string" },
+        "socialEmail": { "type": "string" },
+        "logoBase64": { "type": "string" },
+        "bannerBase64": { "type": "string" },
+        "faviconBase64": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["aiModel", "dailyFreeLimit", "defaultVoiceLang", "defaultSpeechRate", "adsEnabled", "publicRead", "updatedAt"]
+    },
+    "AdminSecurityConfig": {
+      "title": "AdminSecurityConfig",
+      "description": "Admin-only portal password hash, TOTP 2FA secret, and email recovery reset token.",
+      "type": "object",
+      "properties": {
+        "passwordSalt": { "type": "string" },
+        "passwordHash": { "type": "string" },
+        "passwordConfigured": { "type": "boolean" },
+        "twoFactorEnabled": { "type": "boolean" },
+        "totpSecret": { "type": "string" },
+        "recoveryEmail": { "type": "string" },
+        "resetTokenHash": { "type": "string" },
+        "resetExpiresAt": { "type": "integer" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["passwordConfigured", "twoFactorEnabled", "recoveryEmail", "updatedAt"]
+    },
+    "AdminRecord": {
+      "title": "AdminRecord",
+      "description": "Server-provisioned admin role record.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "role": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "role", "createdAt"]
+    },
+    "AdminAuditLog": {
+      "title": "AdminAuditLog",
+      "description": "Immutable administrative action log.",
+      "type": "object",
+      "properties": {
+        "adminUid": { "type": "string" },
+        "adminEmail": { "type": "string" },
+        "action": { "type": "string" },
+        "targetPath": { "type": "string" },
+        "details": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["adminUid", "adminEmail", "action", "targetPath", "details", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Private student profile and preferences."
+    },
+    "/users/{userId}/questions/{questionId}": {
+      "schema": { "$ref": "#/entities/SolvedQuestion" },
+      "description": "User-scoped solved math questions and saved/bookmarked solutions."
+    },
+    "/users/{userId}/scanHistory/{scanId}": {
+      "schema": { "$ref": "#/entities/ScanRecord" },
+      "description": "User-scoped camera scan history."
+    },
+    "/users/{userId}/practiceAttempts/{attemptId}": {
+      "schema": { "$ref": "#/entities/PracticeAttempt" },
+      "description": "User-scoped practice test scores."
+    },
+    "/users/{userId}/notifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/UserNotification" },
+      "description": "User-scoped notifications."
+    },
+    "/supportTickets/{ticketId}": {
+      "schema": { "$ref": "#/entities/SupportTicket" },
+      "description": "Support tickets owned by userId and managed by admins."
+    },
+    "/curriculum/{itemId}": {
+      "schema": { "$ref": "#/entities/CurriculumItem" },
+      "description": "Curriculum items readable when published and managed by admins."
+    },
+    "/plans/{planId}": {
+      "schema": { "$ref": "#/entities/SubscriptionPlan" },
+      "description": "Subscription plan definitions."
+    },
+    "/paymentMethods/{methodId}": {
+      "schema": { "$ref": "#/entities/PaymentMethod" },
+      "description": "Admin-managed payment methods."
+    },
+    "/systemSettings/{settingId}": {
+      "schema": { "$ref": "#/entities/SystemSettings" },
+      "description": "Platform AI, voice, branding, SEO, theme, footer, ads, and scripts configuration."
+    },
+    "/adminSecurity/{docId}": {
+      "schema": { "$ref": "#/entities/AdminSecurityConfig" },
+      "description": "Admin-only portal password, TOTP 2FA, and password reset tokens."
+    },
+    "/admins/{adminId}": {
+      "schema": { "$ref": "#/entities/AdminRecord" },
+      "description": "Trusted admin UID registry."
+    },
+    "/adminLogs/{logId}": {
+      "schema": { "$ref": "#/entities/AdminAuditLog" },
+      "description": "Immutable admin audit log."
+    }
+  }
+}

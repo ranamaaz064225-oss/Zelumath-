@@ -1,0 +1,6 @@
+{
+  "name": "ZELU Math AI",
+  "description": "Your Personal AI Math Teacher — bilingual English and Urdu AI math solver with camera scanning, step-by-step explanations, voice teacher, interactive math whiteboard, curriculum library, and admin panel.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
